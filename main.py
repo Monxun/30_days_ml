@@ -29,9 +29,32 @@ from xgboost import XGBRegressor
 # Load the training data
 X = pd.read_csv("train.csv", encoding='utf-8', index_col=0)
 test = pd.read_csv("test.csv", encoding='utf-8', index_col=0)
+features = X.drop(['target'], axis=1)
 
 y = X['target']
 X = X.drop(['target'], axis= 1)
+
+
+object_cols = [col for col in X.columns if 'cat' in col]
+
+ordinal_encoder = OrdinalEncoder()
+X[object_cols] = ordinal_encoder.fit_transform(features[object_cols])
+test[object_cols] = ordinal_encoder.transform(test[object_cols])
+
+
+X = X.drop(['cat0'], axis= 1)
+X = X.drop(['cat1'], axis= 1)
+X = X.drop(['cat3'], axis= 1)
+X = X.drop(['cat5'], axis= 1)
+X = X.drop(['cat6'], axis= 1)
+
+
+test = test.drop(['cat0'], axis= 1)
+test = test.drop(['cat1'], axis= 1)
+test = test.drop(['cat3'], axis= 1)
+test = test.drop(['cat5'], axis= 1)
+test = test.drop(['cat6'], axis= 1)
+
 # Preview the data
 
 
@@ -48,7 +71,7 @@ for column in categorical_feature_columns:
 lgbm_parameters = {
     'metric': 'rmse', 
     'n_jobs': -1,
-    'n_estimators': 50000,
+    'n_estimators': 100000,
     'reg_alpha': 10.924491968127692,
     'reg_lambda': 17.396730654687218,
     'colsample_bytree': 0.21497646795452627,
@@ -69,7 +92,7 @@ lgbm_parameters = {
 lgbm_val_pred = np.zeros(len(y))
 lgbm_test_pred = np.zeros(len(test))
 mse = []
-kf = KFold(n_splits=30, shuffle=True)
+kf = KFold(n_splits=15, shuffle=True)
 
 for trn_idx, val_idx in tqdm(kf.split(X,y)):
     x_train_idx = X.iloc[trn_idx]
@@ -78,8 +101,8 @@ for trn_idx, val_idx in tqdm(kf.split(X,y)):
     y_valid_idx = y.iloc[val_idx]
 
     lgbm_model = LGBMRegressor(**lgbm_parameters)
-    lgbm_model.fit(x_train_idx, y_train_idx, eval_set = ((x_valid_idx,y_valid_idx)),verbose = -1, early_stopping_rounds = 500,categorical_feature=categorical_feature)  
-    lgbm_test_pred += lgbm_model.predict(test)/30
+    lgbm_model.fit(x_train_idx, y_train_idx, eval_set = ((x_valid_idx,y_valid_idx)),verbose = -1, early_stopping_rounds = 2000,categorical_feature=categorical_feature)  
+    lgbm_test_pred += lgbm_model.predict(test)/15
     mse.append(mean_squared_error(y_valid_idx, lgbm_model.predict(x_valid_idx)))
     
 np.mean(mse)
