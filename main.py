@@ -25,37 +25,31 @@ warnings.filterwarnings('ignore')
 
 from xgboost import XGBRegressor
 
-
 # Load the training data
 X = pd.read_csv("train.csv", encoding='utf-8', index_col=0)
 test = pd.read_csv("test.csv", encoding='utf-8', index_col=0)
-features = X.drop(['target'], axis=1)
 
+cont_features = [f for f in X.columns.tolist() if f.startswith('cont')]
+cat_features = [f for f in X.columns.tolist() if f.startswith('cat')]
+features = cat_features + cont_features
+data = X[features]
 y = X['target']
 X = X.drop(['target'], axis= 1)
+
+all_data = pd.concat([data, test])
 
 
 object_cols = [col for col in X.columns if 'cat' in col]
 
 ordinal_encoder = OrdinalEncoder()
-X[object_cols] = ordinal_encoder.fit_transform(features[object_cols])
-test[object_cols] = ordinal_encoder.transform(test[object_cols])
+X[cat_features] = ordinal_encoder.fit_transform(X[cat_features])
+test[cat_features] = ordinal_encoder.transform(test[cat_features])
 
+# Optional to drop weak feature columns
 
-X = X.drop(['cat0'], axis= 1)
-X = X.drop(['cat1'], axis= 1)
-X = X.drop(['cat3'], axis= 1)
-X = X.drop(['cat5'], axis= 1)
-X = X.drop(['cat6'], axis= 1)
-
-
-test = test.drop(['cat0'], axis= 1)
-test = test.drop(['cat1'], axis= 1)
-test = test.drop(['cat3'], axis= 1)
-test = test.drop(['cat5'], axis= 1)
-test = test.drop(['cat6'], axis= 1)
-
-# Preview the data
+# for i in (0, 1, 3, 5, 6):
+#     X = X.drop([f'cat{i}'], axis=1)
+#     test = test.drop([f'cat{i}'], axis=1)
 
 
 label = LabelEncoder()
@@ -66,12 +60,14 @@ for column in categorical_feature_columns:
         label.fit(X[column])
         X[column] = label.transform(X[column])
         test[column] = label.transform(test[column])
-        
+
+print(X.head)
 
 lgbm_parameters = {
     'metric': 'rmse', 
     'n_jobs': -1,
-    'n_estimators': 100000,
+    'n_estimators': 50000,
+    'num_trees': 80000,
     'reg_alpha': 10.924491968127692,
     'reg_lambda': 17.396730654687218,
     'colsample_bytree': 0.21497646795452627,
@@ -80,7 +76,7 @@ lgbm_parameters = {
     'max_depth': 18,
     'num_leaves': 44,
     'min_child_samples': 27,
-    'max_bin': 4000,
+    'max_bin': 254,
     'cat_l2': 0.025083670064082797
 #     'boosting': 'dart',
 #     'xgboost_dart_mode': True
@@ -101,7 +97,7 @@ for trn_idx, val_idx in tqdm(kf.split(X,y)):
     y_valid_idx = y.iloc[val_idx]
 
     lgbm_model = LGBMRegressor(**lgbm_parameters)
-    lgbm_model.fit(x_train_idx, y_train_idx, eval_set = ((x_valid_idx,y_valid_idx)),verbose = -1, early_stopping_rounds = 2000,categorical_feature=categorical_feature)  
+    lgbm_model.fit(x_train_idx, y_train_idx, eval_set = ((x_valid_idx,y_valid_idx)),verbose = -1, early_stopping_rounds = 500,categorical_feature=categorical_feature)  
     lgbm_test_pred += lgbm_model.predict(test)/15
     mse.append(mean_squared_error(y_valid_idx, lgbm_model.predict(x_valid_idx)))
     
