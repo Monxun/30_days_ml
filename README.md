@@ -1,1 +1,1 @@
-# 30_days_ml
+# 30 Days of ML Competition
